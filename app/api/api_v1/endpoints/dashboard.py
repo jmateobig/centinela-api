@@ -7,13 +7,13 @@ router = APIRouter()
 
 @router.post("/table_comparative_heders")
 async def get_table_heders(jsonBody : comparative_table_heders):
-    return get_table_dashboard_heders(role=jsonBody.role_name, id_company=jsonBody.id_company)
+    return get_table_dashboard_heders(uuid=jsonBody.uuid)
 
 @router.post("/table_comparative_data")
 async def get_table_data(jsonBody : comparative_table_data):
-    return get_table_dashboard_data(role=jsonBody.role_name, id_company=jsonBody.id_company, page=jsonBody.page, filters=jsonBody.filters)
+    return get_table_dashboard_data(uuid=jsonBody.uuid, page=jsonBody.page, filters=jsonBody.filters)
 
 
-@router.get("/cards_comparative/{id_company}")
-async def get_cards_data(id_company: int):
-    return get_cards_dashboard_data(id_company=id_company)
+@router.get("/cards_comparative/{uuid}")
+async def get_cards_data(uuid: str):
+    return get_cards_dashboard_data(uuid=uuid)

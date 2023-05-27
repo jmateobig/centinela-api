@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     ENDPOINT_DB_PASS: str
     ENDPOINT_DB_HOST: str
     ENDPOINT_DB_PORT: str
+    
+    DB_ENGINE: str
+    DB_NAME: str
+    DB_USER: str
+    DB_PASS: str
+    DB_HOST: str
+    DB_PORT: str
 
 
 settings = Settings()

@@ -10,13 +10,11 @@ class filter(BaseModel):
     extra_value:str
 
 class comparative_table_heders(BaseModel):
-    role_name:str
-    id_company:int
+    uuid:str
 
 
 class comparative_table_data(BaseModel):
-    role_name:str
-    id_company:int
+    uuid:str
     like:Optional[str]
     page:Optional[int]
     category:Optional[str]

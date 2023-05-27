@@ -1,7 +1,9 @@
 from api.api_v1.database.connection import query_execute
+from api.api_v1.database.querys_app import get_user
 from sqlalchemy import text
 from api.api_v1.enums.enums import ROLE
 from api.api_v1.enums.enums import TYPE_FILTER
+
 
 
 def get_my_marketplace(id_company):
@@ -42,7 +44,12 @@ def get_filteres(filters):
     return where
 
 
-def get_table_dashboard_heders_value(role, id_company):
+def get_table_dashboard_heders_value(uuid):
+    #Get User
+    user=get_user(uuid)
+    id_company=user[0]
+    role=user[1]
+    
     my_marketplace = get_my_marketplace(id_company=id_company)
     if my_marketplace is None:
         return {'cols': []}
@@ -82,7 +89,12 @@ def get_select_values(role,  my_marketplace, other_marketplaces):
     return {'SELECT_VALUES':SELECT_VALUES, 'MARKETPLACE_VALUES':MARKETPLACE_VALUES, 'MARKETPLACE_IN':MARKETPLACE_IN}
 
 
-def get_query_dashboard_data(role, id_company, page, filters):
+def get_query_dashboard_data(uuid, page, filters):
+    #Get User
+    user=get_user(uuid)
+    id_company=user[0]
+    role=user[1]
+    
     my_marketplace=get_my_marketplace(id_company=id_company)
     
     if my_marketplace is None:
@@ -141,7 +153,11 @@ def get_query_dashboard_data(role, id_company, page, filters):
     return text(query)
 
 
-def get_query_cards_data(id_company):
+def get_query_cards_data(uuid):
+    #Get User
+    user=get_user(uuid)
+    id_company=user[0]
+    
     my_marketplace = get_my_marketplace(id_company=id_company)
     if not my_marketplace:
         return ''
