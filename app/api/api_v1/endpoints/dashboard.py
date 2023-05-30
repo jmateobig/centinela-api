@@ -11,7 +11,7 @@ async def get_table_heders(jsonBody : comparative_table_heders):
 
 @router.post("/table_comparative_data")
 async def get_table_data(jsonBody : comparative_table_data):
-    return get_table_dashboard_data(uuid=jsonBody.uuid, page=jsonBody.page, filters=jsonBody.filters)
+    return get_table_dashboard_data(uuid=jsonBody.uuid, page=jsonBody.page, filters=jsonBody.filters, type_data=jsonBody.type_data)
 
 
 @router.get("/cards_comparative/{uuid}")

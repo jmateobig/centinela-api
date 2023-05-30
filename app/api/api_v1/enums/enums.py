@@ -11,3 +11,10 @@ class TYPE_FILTER(Enum):
     TEXTO = 1
     NUMERO= 2
     FECHA = 3
+    
+    
+class TYPE_DATA(Enum):
+    ALL  = 1
+    DOWN = 2
+    IN   = 3
+    UP   = 4

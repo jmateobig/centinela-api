@@ -1,49 +1,63 @@
 from api.api_v1.database.connection import query_execute
 from api.api_v1.database.querys_app import get_user
 from sqlalchemy import text
-from api.api_v1.enums.enums import ROLE
-from api.api_v1.enums.enums import TYPE_FILTER
+from api.api_v1.enums.enums import ROLE, TYPE_FILTER, TYPE_DATA
 
-
-
+#Metodo para  obtener mi marketplace
 def get_my_marketplace(id_company):
     query = text('''
-                    SELECT a.id_marketplace, b.name as marketplace
-                FROM public.asignament a
-                INNER JOIN marketplace b ON a.id_marketplace=b.id
-                WHERE id_company=:id_company_param
+        SELECT a.id_marketplace, b.name as marketplace
+        FROM public.asignament a
+        INNER JOIN marketplace b ON a.id_marketplace=b.id
+        WHERE id_company=:id_company_param
     ''').bindparams(id_company_param=id_company)
     result = query_execute(query)
-    row = result.fetchone()
-    return row if row is not None else None
+    return result.fetchone() or None
 
 
+#Metodo para  obtener las  marketplaces con las  que compito
 def get_compare_marketplace(id_company):
     query = text('''
-                SELECT a.id_marketplace, b.name as marketplace
-                FROM public.company_marketplace a
-                INNER JOIN marketplace b ON a.id_marketplace=b.id
-                WHERE id_company=:id_company_param
+        SELECT a.id_marketplace, b.name as marketplace
+        FROM public.company_marketplace a
+        INNER JOIN marketplace b ON a.id_marketplace=b.id
+        WHERE id_company=:id_company_param
     ''').bindparams(id_company_param=id_company)
     result = query_execute(query)
-    result = result.fetchall()
-    return result
+    return result.fetchall() or None
 
 
-def get_filteres(filters):
-    where=""
+#Metodo para serializar los filtros  en un array
+def get_filter_conditions(filters):
+    conditions = [] 
     for filter in filters:
-        if filter.value != "":
-            if filter.type_filter==TYPE_FILTER.TEXTO.value:
-                where=where+filter.field+" "+filter.conector+" '"+filter.extra_value+""+filter.value+""+filter.extra_value+"' AND"
-            if filter.type_filter==TYPE_FILTER.NUMERO.value:
-                where=where+filter.field+" "+filter.conector+" "+filter.value+" AND"
-    if (where!=''):
-        where=where[:-4]
-        where='WHERE '+where
+        if filter.value:
+            if filter.type_filter == TYPE_FILTER.TEXTO.value:
+                condition = f"{filter.field} {filter.conector} '{filter.extra_value}{filter.value}{filter.extra_value}'"
+            elif filter.type_filter == TYPE_FILTER.NUMERO.value:
+                condition = f"{filter.field} {filter.conector} {filter.value}"
+            conditions.append(condition)
+    return conditions
+
+
+#Metodo para filtrar por condicion respecto al promedio.
+def get_type_data_condition(type_data, my_marketplace):
+    if type_data == TYPE_DATA.UP.value:
+        return [f'b."{my_marketplace[1]}" > b."Promedio"']
+    elif type_data == TYPE_DATA.IN.value:
+        return [f'b."{my_marketplace[1]}" = b."Promedio"']
+    elif type_data == TYPE_DATA.DOWN.value:
+        return [f'b."{my_marketplace[1]}" < b."Promedio"']
+    return []
+
+
+#Metodo que Serializa el Where
+def get_where_clause(conditions, operator):
+    where = "WHERE " + f" {operator} ".join(conditions) if (conditions) else ""
     return where
 
 
+#Metodo para obtener los Encabezados de la  tabala
 def get_table_dashboard_heders_value(uuid):
     #Get User
     user=get_user(uuid)
@@ -65,32 +79,34 @@ def get_table_dashboard_heders_value(uuid):
     cols += ['Promedio', 'Fecha']    
     return {'cols': cols}
     
-    
-def get_select_values(role,  my_marketplace, other_marketplaces):
-    SELECT_VALUES='b."'+my_marketplace[1]+'", '
-    MARKETPLACE_VALUES=''
-    MARKETPLACE_IN=str(my_marketplace[0])
-    n=1
+
+#Metodo para generar los encabezados dinamicos para el select
+def get_select_values(role, my_marketplace, other_marketplaces):
+    SELECT_VALUES = f'b."{my_marketplace[1]}", '
+    MARKETPLACE_VALUES = []
+    MARKETPLACE_IN = [str(my_marketplace[0])]
+    n = 1
+
     for marketplace in other_marketplaces:
-        if (role==ROLE.ADMIN.value or role==ROLE.PLAN_3.value):
-            SELECT_VALUES=SELECT_VALUES+'b."'+marketplace[1]+'", '
-            MARKETPLACE_VALUES=MARKETPLACE_VALUES+' MAX(CASE WHEN mp.Id_marketplace = '+str(marketplace[0])+' THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "'+marketplace[1]+'", '
-        elif (role==ROLE.PLAN_2.value):
-            SELECT_VALUES=SELECT_VALUES+'b."Tienda_'+str(n)+'", '
-            MARKETPLACE_VALUES=MARKETPLACE_VALUES+' MAX(CASE WHEN mp.Id_marketplace = '+str(marketplace[0])+' THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "Tienda_'+str(n)+'", '
-        MARKETPLACE_IN=MARKETPLACE_IN+", "+str(marketplace[0])
-        n=n+1
-        
-    SELECT_VALUES=SELECT_VALUES+'b."Promedio", '
-    MARKETPLACE_VALUES='''
-                            MAX(CASE WHEN mp.Id_marketplace = '''+str(my_marketplace[0])+''' THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "'''+my_marketplace[1]+'''", 
-                            ROUND(AVG(CASE WHEN mp.Id_marketplace NOT IN ('''+str(my_marketplace[0])+''') THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END), 2) AS "Promedio",
-                        '''+ MARKETPLACE_VALUES
-    return {'SELECT_VALUES':SELECT_VALUES, 'MARKETPLACE_VALUES':MARKETPLACE_VALUES, 'MARKETPLACE_IN':MARKETPLACE_IN}
+        if role == ROLE.ADMIN.value or role == ROLE.PLAN_3.value:
+            SELECT_VALUES += f'b."{marketplace[1]}", '
+            MARKETPLACE_VALUES.append(f'MAX(CASE WHEN mp.Id_marketplace = {marketplace[0]} THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "{marketplace[1]}", ')
+        elif role == ROLE.PLAN_2.value:
+            SELECT_VALUES += f'b."Tienda_{n}", '
+            MARKETPLACE_VALUES.append(f'MAX(CASE WHEN mp.Id_marketplace = {marketplace[0]} THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "Tienda_{n}", ')
+        MARKETPLACE_IN.append(str(marketplace[0]))
+        n += 1
+
+    SELECT_VALUES += 'b."Promedio", '
+    MARKETPLACE_VALUES.append(f'MAX(CASE WHEN mp.Id_marketplace = {my_marketplace[0]} THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "{my_marketplace[1]}", ')
+    MARKETPLACE_VALUES.append(f'ROUND(AVG(CASE WHEN mp.Id_marketplace NOT IN ({my_marketplace[0]}) THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END), 2) AS "Promedio",')
+    MARKETPLACE_VALUES = "\n".join(MARKETPLACE_VALUES)
+
+    return {'SELECT_VALUES': SELECT_VALUES, 'MARKETPLACE_VALUES': MARKETPLACE_VALUES, 'MARKETPLACE_IN': ", ".join(MARKETPLACE_IN)}
 
 
-def get_query_dashboard_data(uuid, page, filters):
-    #Get User
+#Metodo para obtner los datos de la tabla comparativa
+def get_query_dashboard_data(uuid, page, filters, type_data):
     user=get_user(uuid)
     id_company=user[0]
     role=user[1]
@@ -107,14 +123,17 @@ def get_query_dashboard_data(uuid, page, filters):
     SELECT_VALUES=selects['SELECT_VALUES']
     MARKETPLACE_VALUES=selects['MARKETPLACE_VALUES']
     MARKETPLACE_IN=selects['MARKETPLACE_IN']
-    WHERE=get_filteres(filters)
+    
+    conditions = get_filter_conditions(filters=filters)
+    type_data_condition = get_type_data_condition(type_data=type_data, my_marketplace=my_marketplace)
+    conditions.extend(type_data_condition)
+    WHERE = get_where_clause(conditions=conditions, operator='AND')
     
     query = f'''
             Select a.name, a.sku, {SELECT_VALUES} TO_CHAR(b."Fecha", 'DD/MM/YYYY') AS "Fecha"
             from 
             (Select id_product, name, sku from public.marketplace_product
             where id_marketplace={my_marketplace[0]}) as a
-
             inner join (
                 SELECT
                 mp.Id_product, {MARKETPLACE_VALUES}
@@ -153,8 +172,8 @@ def get_query_dashboard_data(uuid, page, filters):
     return text(query)
 
 
+#Metodo para obtener la infomracion de las cards
 def get_query_cards_data(uuid):
-    #Get User
     user=get_user(uuid)
     id_company=user[0]
     
@@ -196,7 +215,8 @@ def get_query_cards_data(uuid):
     '''
     return text(query)
     
-    
+
+#Metodo para serealizar una tabla  y enviarla al front
 def get_table(query):
     rows = []
     # cols = []

@@ -15,8 +15,10 @@ class comparative_table_heders(BaseModel):
 
 class comparative_table_data(BaseModel):
     uuid:str
+    type_data:int
     like:Optional[str]
     page:Optional[int]
     category:Optional[str]
     brand:Optional[str]
     filters:List[filter]
+    
