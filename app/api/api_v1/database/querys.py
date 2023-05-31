@@ -169,6 +169,7 @@ def get_query_dashboard_data(uuid, page, filters, type_data):
             LIMIT 10
             OFFSET {page};
         '''
+    print (query)
     return text(query)
 
 

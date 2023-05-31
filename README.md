@@ -65,3 +65,27 @@ python .\src\manage.py migrate
    "start": 10,
    "column_order": 1  
  }
+
+
+ Query
+ SELECT a.name, a.sku, b."Way", b."Gallo", b."Max", b."Promedio", TO_CHAR(b."Fecha", 'DD/MM/YYYY') AS "Fecha"
+FROM
+    (SELECT id_product, name, sku FROM public.marketplace_product WHERE id_marketplace = 5) AS a
+INNER JOIN (
+    SELECT
+        mp.Id_product,
+        MAX(CASE WHEN mp.Id_marketplace = 5 THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "Way",
+        MAX(CASE WHEN mp.Id_marketplace = 1 THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "Gallo",
+        MAX(CASE WHEN mp.Id_marketplace = 2 THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END) AS "Max",
+        ROUND(AVG(CASE WHEN mp.Id_marketplace NOT IN (5) THEN COALESCE(LEAST(p.Price, p.Offer_Price), 0) END), 2) AS "Promedio",
+        p.Date_Start AS "Fecha"
+    FROM
+        Marketplace_Product mp
+    INNER JOIN Price p ON p.Id_Marketplace_Product = mp.Id
+    WHERE
+        mp.Id_marketplace IN (5, 1, 2)
+    GROUP BY
+        mp.Id_product, p.Date_Start
+) AS b ON a.id_product = b.id_product
+ORDER BY
+    a.name, b."Fecha";
