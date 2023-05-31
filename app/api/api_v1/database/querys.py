@@ -214,6 +214,23 @@ def get_query_cards_data(uuid):
         INNER JOIN public.marketplace_product AS a ON a.id_product = b.id_product AND a.id_marketplace = {in_value};
     '''
     return text(query)
+
+def get_query_filter_product(uuid):
+    user=get_user(uuid)
+    id_company=user[0]
+    
+    my_marketplace = get_my_marketplace(id_company=id_company)
+    if not my_marketplace:
+        return ''
+    query = f'''
+        SELECT p.id,concat('(', mp.sku, ') ', mp.name) as name, mp.description
+        FROM public.marketplace_product mp
+        inner join public.product p on p.id=mp.id_product
+        where id_marketplace={my_marketplace[0]}
+        order by mp.sku;
+    '''
+    return text(query)
+    
     
 
 #Metodo para serealizar una tabla  y enviarla al front

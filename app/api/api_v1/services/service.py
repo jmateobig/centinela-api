@@ -1,5 +1,5 @@
 from api.api_v1.database.querys import get_table, get_table_dashboard_heders_value
-from api.api_v1.database.querys import get_query_dashboard_data, get_query_cards_data
+from api.api_v1.database.querys import get_query_dashboard_data, get_query_cards_data, get_query_filter_product
 
 
 def get_table_dashboard_heders(uuid):
@@ -12,4 +12,7 @@ def get_table_dashboard_data(uuid, page, filters, type_data):
 def get_cards_dashboard_data(uuid):
     query = get_query_cards_data(uuid=uuid)
     return get_table(query=query)
-    
+
+def get_filter_dashboard_product(uuid):
+    query = get_query_filter_product(uuid=uuid)
+    return get_table(query=query)
