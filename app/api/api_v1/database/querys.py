@@ -32,6 +32,7 @@ def get_filter_conditions(filters):
     conditions = [] 
     for filter in filters:
         if filter.value:
+            condition=''
             if filter.type_filter == TYPE_FILTER.TEXTO.value:
                 condition = f"{filter.field} {filter.conector} '{filter.extra_value}{filter.value}{filter.extra_value}'"
             elif filter.type_filter == TYPE_FILTER.NUMERO.value:
@@ -169,7 +170,6 @@ def get_query_dashboard_data(uuid, page, filters, type_data):
             LIMIT 10
             OFFSET {page};
         '''
-    print (query)
     return text(query)
 
 
@@ -231,7 +231,156 @@ def get_query_filter_product(uuid):
         order by mp.sku;
     '''
     return text(query)
+
+
+
+def get_select_values_chart(role, my_marketplace, other_marketplaces):
+    if role == ROLE.ADMIN.value or role == ROLE.PLAN_3.value:
+        marketplace_ids_in = [my_marketplace[0]] + [mp[0] for mp in other_marketplaces]
+        marketplace_ids_out = [mp[0] for mp in other_marketplaces]
+        select_value = "mm.name, "
+    elif role == ROLE.PLAN_2.value:
+        marketplace_ids_in = [my_marketplace[0]] + [mp[0] for mp in other_marketplaces]
+        marketplace_ids_out = [mp[0] for mp in other_marketplaces]
+        select_value = f"""
+            CASE
+                WHEN mp.Id_Marketplace = {my_marketplace[0]} THEN name
+                ELSE mm.name_2
+            END AS name, 
+        """
+    elif role == ROLE.PLAN_1.value:
+        marketplace_ids_in = [my_marketplace[0]]
+        marketplace_ids_out = [mp[0] for mp in other_marketplaces]
+        select_value = "mm.name, "
     
+    return {
+        'SELECT_VALUE': select_value,
+        'MARKETPLACES_IN': ','.join(str(id) for id in marketplace_ids_in),
+        'MARKETPLACES_OUT': ','.join(str(id) for id in marketplace_ids_out),
+        
+    }
+
+
+
+def get_query_time_line_product (uuid, id_product):
+    user=get_user(uuid)
+    id_company=user[0]
+    role=user[1]
+    
+    my_marketplace=get_my_marketplace(id_company=id_company)
+    
+    if my_marketplace is None:
+        return ''
+    other_marketplaces=get_compare_marketplace(id_company=id_company)
+    if other_marketplaces is None:
+        return ''
+    selects=get_select_values_chart(role=role, my_marketplace=my_marketplace, other_marketplaces=other_marketplaces)
+    SELECT_VALUE=selects['SELECT_VALUE']
+    MARKETPLACES_IN=selects['MARKETPLACES_IN']
+    MARKETPLACES_OUT=selects['MARKETPLACES_OUT']
+    query=f'''
+       SELECT 
+       {SELECT_VALUE}
+        TO_CHAR(d.date_start, 'DD/MM/YYYY') AS formatted_date,
+        LEAST(COALESCE(p.Price, p3.Price), COALESCE(p.Offer_Price, p3.Offer_Price)) AS Lowest_Price
+        FROM
+        marketplace_product mp
+        CROSS JOIN (
+            SELECT DISTINCT date_start
+            FROM price
+            WHERE Id_Marketplace_Product IN (
+            SELECT mp2.Id
+            FROM marketplace_product mp2
+            WHERE mp2.Id_Product = {id_product}
+                AND mp2.Id_Marketplace = {my_marketplace[0]}
+            )
+        ) d
+        LEFT JOIN price p ON p.Id_Marketplace_Product = mp.Id
+            AND p.date_start = d.date_start
+        LEFT JOIN (
+            SELECT
+            mp3.Id_Product,
+            mp3.Id_Marketplace,
+            MAX(p3.date_start) AS max_date_start
+            FROM
+            marketplace_product mp3
+            INNER JOIN price p3 ON p3.Id_Marketplace_Product = mp3.Id
+            WHERE
+            mp3.Id_Product = {id_product}
+            AND mp3.Id_Marketplace IN ({MARKETPLACES_IN})
+            GROUP BY
+            mp3.Id_Product,
+            mp3.Id_Marketplace
+        ) m ON m.Id_Product = mp.Id_Product
+            AND m.Id_Marketplace = mp.Id_Marketplace
+            AND p.date_start IS NULL
+        LEFT JOIN price p3 ON p3.Id_Marketplace_Product = mp.Id
+            AND p3.date_start = m.max_date_start
+        LEFT JOIN Marketplace mm ON mm.Id = mp.Id_Marketplace
+        WHERE
+        mp.Id_Product = {id_product}
+        AND mp.Id_Marketplace IN ({MARKETPLACES_IN})
+
+        UNION ALL
+
+        SELECT
+        a.name,
+        a.formatted_date,
+        ROUND(AVG(a.Lowest_Price), 2) AS Lowest_Price
+        FROM
+        (
+            SELECT
+            0 AS id,
+            'Promedio' AS name,
+            TO_CHAR(d.date_start, 'DD/MM/YYYY') AS formatted_date,
+            LEAST(COALESCE(p.Price, p3.Price), COALESCE(p.Offer_Price, p3.Offer_Price)) AS Lowest_Price
+            FROM
+            marketplace_product mp
+            CROSS JOIN (
+                SELECT DISTINCT date_start
+                FROM price
+                WHERE Id_Marketplace_Product IN (
+                SELECT mp2.Id
+                FROM marketplace_product mp2
+                WHERE mp2.Id_Product = {id_product}
+                    AND mp2.Id_Marketplace = {my_marketplace[0]}
+                )
+            ) d
+            LEFT JOIN price p ON p.Id_Marketplace_Product = mp.Id
+                AND p.date_start = d.date_start
+            LEFT JOIN (
+                SELECT
+                mp3.Id_Product,
+                mp3.Id_Marketplace,
+                MAX(p3.date_start) AS max_date_start
+                FROM
+                marketplace_product mp3
+                INNER JOIN price p3 ON p3.Id_Marketplace_Product = mp3.Id
+                WHERE
+                mp3.Id_Product = {id_product}
+                AND mp3.Id_Marketplace IN (1, 2)
+                GROUP BY
+                mp3.Id_Product,
+                mp3.Id_Marketplace
+            ) m ON m.Id_Product = mp.Id_Product
+                AND m.Id_Marketplace = mp.Id_Marketplace
+                AND p.date_start IS NULL
+            LEFT JOIN price p3 ON p3.Id_Marketplace_Product = mp.Id
+                AND p3.date_start = m.max_date_start
+            LEFT JOIN Marketplace mm ON mm.Id = mp.Id_Marketplace
+            WHERE
+            mp.Id_Product = {id_product}
+            AND mp.Id_Marketplace IN ({MARKETPLACES_OUT})
+        ) AS a
+        GROUP BY
+        a.name,
+        a.formatted_date
+
+        ORDER BY
+        name,
+        formatted_date
+    '''
+    return text(query)
     
 
 #Metodo para serealizar una tabla  y enviarla al front
