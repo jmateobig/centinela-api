@@ -235,7 +235,7 @@ def get_query_filter_product(uuid):
 
 
 def get_select_values_chart(role, my_marketplace, other_marketplaces):
-    if role == ROLE.ADMIN.value or role == ROLE.PLAN_3.value:
+    if  role == ROLE.ADMIN.value or role == ROLE.PLAN_3.value:
         marketplace_ids_in = [my_marketplace[0]] + [mp[0] for mp in other_marketplaces]
         marketplace_ids_out = [mp[0] for mp in other_marketplaces]
         select_value = "mm.name, "
@@ -244,7 +244,7 @@ def get_select_values_chart(role, my_marketplace, other_marketplaces):
         marketplace_ids_out = [mp[0] for mp in other_marketplaces]
         select_value = f"""
             CASE
-                WHEN mp.Id_Marketplace = {my_marketplace[0]} THEN name
+                WHEN mp.Id_Marketplace = {my_marketplace[0]} THEN mm.name
                 ELSE mm.name_2
             END AS name, 
         """
@@ -257,9 +257,7 @@ def get_select_values_chart(role, my_marketplace, other_marketplaces):
         'SELECT_VALUE': select_value,
         'MARKETPLACES_IN': ','.join(str(id) for id in marketplace_ids_in),
         'MARKETPLACES_OUT': ','.join(str(id) for id in marketplace_ids_out),
-        
     }
-
 
 
 def get_query_time_line_product (uuid, id_product):
@@ -268,12 +266,12 @@ def get_query_time_line_product (uuid, id_product):
     role=user[1]
     
     my_marketplace=get_my_marketplace(id_company=id_company)
-    
     if my_marketplace is None:
         return ''
     other_marketplaces=get_compare_marketplace(id_company=id_company)
     if other_marketplaces is None:
         return ''
+    
     selects=get_select_values_chart(role=role, my_marketplace=my_marketplace, other_marketplaces=other_marketplaces)
     SELECT_VALUE=selects['SELECT_VALUE']
     MARKETPLACES_IN=selects['MARKETPLACES_IN']
@@ -381,6 +379,69 @@ def get_query_time_line_product (uuid, id_product):
         formatted_date
     '''
     return text(query)
+
+
+def get_select_values_marketplace_out(role, other_marketplaces):
+    marketplace_ids_out = [mp[0] for mp in other_marketplaces]
+    return ','.join(str(id) for id in marketplace_ids_out)
+
+
+def subquery_card(order, values_in, product, role, name):
+    return f'''
+    (SELECT a.name AS marketplace, a.price AS value_product, a.formatted_date AS date_product
+        FROM (
+        SELECT a.id_product, {name} AS name,
+        ROUND(LEAST(p.price, p.offer_price), 2) AS price,
+            TO_CHAR(p.date_start, 'DD/MM/YYYY') AS formatted_date
+            FROM public.marketplace_product a
+            INNER JOIN public.price p ON p.id_marketplace_product = a.id
+            INNER JOIN public.marketplace m ON m.id = a.id_marketplace
+        WHERE m.id IN ({values_in}) AND a.id_product = {product}) a
+        ORDER BY a.price {order}
+        LIMIT 1)
+    '''
+
+
+def subquery_card_2(values_in, product, role, name):
+    return f'''
+    (
+    SELECT 'Promedio' AS marketplace, ROUND(AVG(a.price),2) AS value_product, '00/00/0000' AS date_product
+            FROM (
+                SELECT a.id_product, {name} AS name,
+                ROUND(LEAST(p.price, p.offer_price), 2) AS price,
+                TO_CHAR(p.date_start, 'DD/MM/YYYY') AS formatted_date
+                FROM public.marketplace_product a
+                INNER JOIN public.price p ON p.id_marketplace_product = a.id
+                INNER JOIN public.marketplace m ON m.id = a.id_marketplace
+                WHERE m.id IN ({values_in}) AND a.id_product = {product}
+            ) a
+        GROUP BY (marketplace, date_product)
+    )
+    '''
+
+
+def get_query_cards_product(uuid, id_product):
+    user = get_user(uuid)
+    id_company = user[0]
+    role = user[1]
+    
+    my_marketplace = get_my_marketplace(id_company=id_company)
+    if my_marketplace is None:
+        return ''
+    other_marketplaces = get_compare_marketplace(id_company=id_company)
+    if other_marketplaces is None:
+        return ''
+    values_in = get_select_values_marketplace_out(role=role, other_marketplaces=other_marketplaces)
+    name = 'm.name' if role in [ROLE.ADMIN.value, ROLE.PLAN_3.value] else 'm.name_2'
+    query_parts = []
+    query_parts.append(subquery_card(order='asc', values_in=my_marketplace[0], product=id_product, role=role, name=name))
+    query_parts.append(subquery_card(order='desc', values_in=my_marketplace[0], product=id_product, role=role, name=name))
+    query_parts.append(subquery_card_2(values_in=my_marketplace[0], product=id_product, role=role, name=name))
+    query_parts.append(subquery_card(order='asc', values_in=values_in, product=id_product, role=role, name=name))
+    query_parts.append(subquery_card(order='desc', values_in=values_in, product=id_product, role=role, name=name))
+    query_parts.append(subquery_card_2(values_in=values_in, product=id_product, role=role, name=name))
+    query = ' UNION ALL '.join(query_parts)
+    return query
     
 
 #Metodo para serealizar una tabla  y enviarla al front

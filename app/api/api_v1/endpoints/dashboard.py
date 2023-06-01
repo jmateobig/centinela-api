@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from api.api_v1.models.models import comparative_table_heders, comparative_table_data
 from api.api_v1.services.service import get_table_dashboard_data, get_cards_dashboard_data
 from api.api_v1.services.service import get_table_dashboard_heders, get_filter_dashboard_product
-from api.api_v1.services.service import get_timeline_product_data
+from api.api_v1.services.service import get_timeline_product_data, get_cards_product_data
 
 router = APIRouter()
 
@@ -27,3 +27,7 @@ async def get_filter_product(uuid: str):
 @router.get("/get_timel_line_product/{uuid}/{id_product}")
 async def get_time_line_product(uuid: str, id_product:str):
     return get_timeline_product_data(uuid=uuid, id_product=id_product)
+
+@router.get("/get_cards_product/{uuid}/{id_product}")
+async def get_cards_product(uuid: str, id_product:str):
+    return get_cards_product_data(uuid=uuid, id_product=id_product)
