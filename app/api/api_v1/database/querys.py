@@ -107,7 +107,7 @@ def get_select_values(role, my_marketplace, other_marketplaces):
 
 
 #Metodo para obtner los datos de la tabla comparativa
-def get_query_dashboard_data(uuid, page, filters, type_data):
+def get_query_dashboard_data(uuid, page, filters, type_data, categories):
     user=get_user(uuid)
     id_company=user[0]
     role=user[1]
@@ -129,12 +129,14 @@ def get_query_dashboard_data(uuid, page, filters, type_data):
     type_data_condition = get_type_data_condition(type_data=type_data, my_marketplace=my_marketplace)
     conditions.extend(type_data_condition)
     WHERE = get_where_clause(conditions=conditions, operator='AND')
+    categories = f"AND pr.id_category IN ({','.join(str(category) for category in categories)})" if categories else ""
     
     query = f'''
             Select a.name, a.sku, {SELECT_VALUES} TO_CHAR(b."Fecha", 'DD/MM/YYYY') AS "Fecha"
             from 
-            (Select id_product, name, sku from public.marketplace_product
-            where id_marketplace={my_marketplace[0]}) as a
+            (Select mrp.id_product, mrp.name, mrp.sku from public.marketplace_product mrp
+            inner join product pr on pr.id=mrp.id_product
+            where id_marketplace={my_marketplace[0]} {categories}) as a
             inner join (
                 SELECT
                 mp.Id_product, {MARKETPLACE_VALUES}
@@ -174,7 +176,7 @@ def get_query_dashboard_data(uuid, page, filters, type_data):
 
 
 #Metodo para obtener la infomracion de las cards
-def get_query_cards_data(uuid):
+def get_query_cards_data(uuid, categories):
     user=get_user(uuid)
     id_company=user[0]
     
@@ -189,6 +191,8 @@ def get_query_cards_data(uuid):
     select_value = f'b."{my_marketplace[1]}"'
     in_value = str(my_marketplace[0])
     ex_values = ', '.join(str(marketplace[0]) for marketplace in other_marketplaces)
+    
+    categories = f"WHERE p.id_category IN ({','.join(str(category) for category in categories)})" if categories else ""
 
     query = f'''
         SELECT 
@@ -212,14 +216,17 @@ def get_query_cards_data(uuid):
             WHERE mp.Id_marketplace IN ({in_value}, {ex_values})
             GROUP BY mp.Id_product
         ) AS b
-        INNER JOIN public.marketplace_product AS a ON a.id_product = b.id_product AND a.id_marketplace = {in_value};
+        INNER JOIN public.marketplace_product AS a ON a.id_product = b.id_product AND a.id_marketplace = {in_value}
+        INNER JOIN public.product as p on p.id=a.id_product
+        {categories};
     '''
     return text(query)
 
-def get_query_filter_product(uuid):
+
+def get_query_filter_product(uuid, categories):
     user=get_user(uuid)
     id_company=user[0]
-    
+    categories = f"AND p.id_category IN ({','.join(str(category) for category in categories)})" if categories else ""
     my_marketplace = get_my_marketplace(id_company=id_company)
     if not my_marketplace:
         return ''
@@ -227,11 +234,10 @@ def get_query_filter_product(uuid):
         SELECT p.id,concat('(', mp.sku, ') ', mp.name) as name, mp.description
         FROM public.marketplace_product mp
         inner join public.product p on p.id=mp.id_product
-        where id_marketplace={my_marketplace[0]}
+        where id_marketplace={my_marketplace[0]} {categories}
         order by mp.sku;
     '''
     return text(query)
-
 
 
 def get_select_values_chart(role, my_marketplace, other_marketplaces):
@@ -442,7 +448,25 @@ def get_query_cards_product(uuid, id_product):
     query_parts.append(subquery_card_2(values_in=values_in, product=id_product, role=role, name=name))
     query = ' UNION ALL '.join(query_parts)
     return query
+
+
+def get_query_filter_categories(uuid):
+    user = get_user(uuid)
+    id_company = user[0]
     
+    my_marketplace = get_my_marketplace(id_company=id_company)
+    if my_marketplace is None:
+        return ''
+    
+    query=f'''
+    SELECT c.id, concat(c.name, ' (',COUNT(p.id), ')') as category
+        FROM public.category AS c
+        LEFT JOIN public.product AS p ON c.id = p.id_category
+        LEFT JOIN public.marketplace_product AS mp ON p.id = mp.id_product AND mp.id_marketplace = {my_marketplace[0]}
+        GROUP BY c.id, c.name
+        order by c.name;
+    '''
+    return query
 
 #Metodo para serealizar una tabla  y enviarla al front
 def get_table(query):

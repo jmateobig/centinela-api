@@ -9,6 +9,7 @@ class filter(BaseModel):
     value:Optional[str]
     extra_value:str
 
+
 class comparative_table_heders(BaseModel):
     uuid:str
 
@@ -21,4 +22,9 @@ class comparative_table_data(BaseModel):
     category:Optional[str]
     brand:Optional[str]
     filters:List[filter]
+    categories:List[int]
     
+    
+class body_products(BaseModel):
+    uuid:str
+    categories:List[int]
