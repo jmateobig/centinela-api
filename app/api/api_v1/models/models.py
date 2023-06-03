@@ -1,6 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, List,Optional,Dict
-
+from typing import   List,Optional
 
 class filter(BaseModel):
     field:str
