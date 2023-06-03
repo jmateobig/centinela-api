@@ -35,12 +35,16 @@ def query_home_cards_values(uuid, categories):
     user=get_user(uuid)
     id_company=user[0]
     my_marketplace=get_my_marketplace(id_company=id_company)
+    categories_1 = f"WHERE p.id_category IN ({','.join(str(category) for category in categories)})" if categories else ""
+    categories_2 = f"AND p.id_category IN ({','.join(str(category) for category in categories)})" if categories else ""
+    
     if my_marketplace is None:
         return ''
-    
+        
     query=f'''
-        SELECT count(distinct id) as productos_totales
-        FROM public.product
+        SELECT count(distinct p.id) as productos_totales
+        FROM public.product p
+        {categories_1}
     '''
     result1 = query_execute(query).fetchone()
     
@@ -48,7 +52,7 @@ def query_home_cards_values(uuid, categories):
         select count(distinct mp.id) as productos_propios
         from public.marketplace_product mp
         inner join product p on p.id=mp.id_product
-        where mp.id_marketplace={my_marketplace[0]};
+        where mp.id_marketplace={my_marketplace[0]} {categories_2};
     '''
     result2 = query_execute(query).fetchone()
     
@@ -56,7 +60,7 @@ def query_home_cards_values(uuid, categories):
         SELECT COUNT(DISTINCT mp.id) AS productos_match
         FROM public.marketplace_product mp
         INNER JOIN public.product p ON p.id = mp.id_product
-        WHERE mp.id_marketplace = 5
+        WHERE mp.id_marketplace = 5 {categories_2}
         AND EXISTS (
             SELECT 1
             FROM public.marketplace_product mp2
