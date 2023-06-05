@@ -82,17 +82,46 @@ def query_home_cards_values(uuid, categories):
     return {"data": [[result1[0]],[result2[0]],[result3[0]],[result4[0]] if result4 else ['dd/mm/yyyy'],[result4[1]] if result4 else [0]]}
 
 
+#Metodo para obtener las categorias
+def query_home_chart(uuid, categories):
+    user = get_user(uuid)
+    id_company, role = user[:2]
+    
+    my_marketplace = get_my_marketplace(id_company=id_company)
+    other_marketplaces = get_compare_marketplace(id_company=id_company)
+    if not my_marketplace or not other_marketplaces:
+        return ''
+    
+    in_value = str(my_marketplace[0])
+    ex_values = ', '.join(str(marketplace[0]) for marketplace in other_marketplaces)
+    
+    name = 'm.name'
+    if role in [ROLE.PLAN_2.value, ROLE.PLAN_3.value, ROLE.PLAN_f.value]:
+        name += '_2'
+
+    categories_filter = f"AND pr.id_category IN ({','.join(str(category) for category in categories)})" if categories else ""
+    
+    query = f'''
+        SELECT {name}, TO_CHAR(p.date_start, 'DD/MM/YYYY') AS "Fecha", count(distinct pr.id)
+        FROM public.price p
+        INNER JOIN marketplace_product mp ON mp.id = p.id_marketplace_product
+        INNER JOIN product pr ON pr.id = mp.id_product
+        INNER JOIN marketplace m ON m.id = mp.id_marketplace
+        WHERE m.id IN ({in_value}, {ex_values}) {categories_filter}
+        GROUP BY p.date_start, {name}
+        ORDER BY p.date_start, {name};
+    '''
+    return query
+
+
 #Metodo para obtener la infomracion de las cards
 def query_cards_data(uuid, categories):
     user=get_user(uuid)
     id_company=user[0]
     
     my_marketplace = get_my_marketplace(id_company=id_company)
-    if not my_marketplace:
-        return ''
-
     other_marketplaces = get_compare_marketplace(id_company=id_company)
-    if not other_marketplaces:
+    if not my_marketplace or not other_marketplaces:
         return ''
 
     select_value = f'b."{my_marketplace[1]}"'
@@ -134,8 +163,7 @@ def query_cards_data(uuid, categories):
 def query_table_comparative_heders(uuid):
     #Get User
     user=get_user(uuid)
-    id_company=user[0]
-    role=user[1]
+    id_company, role = user[:2]
     
     my_marketplace = get_my_marketplace(id_company=id_company)
     if my_marketplace is None:
@@ -156,8 +184,7 @@ def query_table_comparative_heders(uuid):
 #Metodo para obtner los datos de la tabla comparativa
 def query_table_comparative_data(uuid, page, filters, type_data, categories):
     user=get_user(uuid)
-    id_company=user[0]
-    role=user[1]
+    id_company, role = user[:2]
     
     my_marketplace=get_my_marketplace(id_company=id_company)
     
@@ -243,15 +270,13 @@ def query_filter_product(uuid, categories):
 #Metodo para obtener los valores minimo, maximo y promedio de un producto y su competencia
 def query_cards_product(uuid, id_product):
     user = get_user(uuid)
-    id_company = user[0]
-    role = user[1]
+    id_company, role = user[:2]
     
     my_marketplace = get_my_marketplace(id_company=id_company)
-    if my_marketplace is None:
-        return ''
     other_marketplaces = get_compare_marketplace(id_company=id_company)
-    if other_marketplaces is None:
+    if not my_marketplace or not other_marketplaces:
         return ''
+    
     values_in = get_select_values_marketplace_out(other_marketplaces=other_marketplaces)
     name = 'm.name' if role in [ROLE.ADMIN.value, ROLE.PLAN_3.value] else 'm.name_2'
     query_parts = []
@@ -268,8 +293,7 @@ def query_cards_product(uuid, id_product):
 #Metodo para obtener la linea de precios de un producto
 def query_timel_line_product (uuid, id_product):
     user=get_user(uuid)
-    id_company=user[0]
-    role=user[1]
+    id_company, role = user[:2]
     
     my_marketplace=get_my_marketplace(id_company=id_company)
     if my_marketplace is None:

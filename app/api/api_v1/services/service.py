@@ -1,5 +1,5 @@
 from api.api_v1.database.querys import get_table
-from api.api_v1.database.querys import query_categories, query_home_cards_values
+from api.api_v1.database.querys import query_categories, query_home_cards_values, query_home_chart
 from api.api_v1.database.querys import query_cards_data, query_table_comparative_heders, query_table_comparative_data
 from api.api_v1.database.querys import query_filter_product, query_cards_product, query_timel_line_product
 
@@ -9,6 +9,10 @@ def service_categories(uuid):
 
 def service_home_cards_values(uuid, categories):
     return query_home_cards_values(uuid=uuid,categories=categories)
+
+def service_home_chart(uuid, categories):
+    query=query_home_chart(uuid=uuid,categories=categories)
+    return get_table(query=query)
 
 def service_cards_data(uuid, categories):
     query = query_cards_data(uuid=uuid, categories=categories)
