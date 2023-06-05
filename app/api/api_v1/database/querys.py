@@ -69,7 +69,17 @@ def query_home_cards_values(uuid, categories):
         );
     '''
     result3 = query_execute(query).fetchone()
-    return {"data": [[(result1[0])],[(result2[0])],[(result3[0])]]}
+    query=f'''
+        SELECT  TO_CHAR(pr."date_start", 'DD/MM/YYYY') AS "Fecha", count(distinct p.id)
+        FROM public.price pr
+        inner join marketplace_product mp on mp.id=pr.id_marketplace_product
+        inner join product p on p.id=mp.id_product
+        {categories_1}
+        group by pr.date_start
+        order by pr.date_start desc limit 1;
+    '''
+    result4 = query_execute(query).fetchone()
+    return {"data": [[result1[0]],[result2[0]],[result3[0]],[result4[0]] if result4 else ['dd/mm/yyyy'],[result4[1]] if result4 else [0]]}
 
 
 #Metodo para obtener la infomracion de las cards
